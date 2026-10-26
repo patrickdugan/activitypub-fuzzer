@@ -1,0 +1,30 @@
+name: Verify Complicency ActivityPub Fixtures
+
+on:
+  push:
+    branches:
+      - experiment/activitypub-authority-envelopes-20261026
+  pull_request:
+    paths:
+      - research/complicency/**
+      - .github/workflows/complicency-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test deterministic paired envelopes
+        run: node --test research/complicency/pairs.test.mjs
+      - name: Generate JSONL fixture and inspect counts
+        run: |
+          node research/complicency/generate.mjs --seed 41 --repetitions 3 --out /tmp/authority_pairs.jsonl
+          test "$(wc -l < /tmp/authority_pairs.jsonl)" -eq 48
+          node -e "const fs=require('fs');const a=fs.readFileSync('/tmp/authority_pairs.jsonl','utf8').trim().split('\n').map(JSON.parse);if(a.some(x=>x.schema_version!=='complicency.activitypub-envelope.v1')) process.exit(1)"
